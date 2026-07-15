@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/supabaseClient';
-import { authRedirectUrl, isApprovedEmail } from '@/lib/auth';
+import { authRedirectUrl } from '@/lib/auth';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 
@@ -22,12 +22,6 @@ export function LoginForm() {
     if (!email.trim()) {
       setStatus('error');
       setMessage('이메일 주소를 입력해주세요.');
-      return;
-    }
-
-    if (!isApprovedEmail(email)) {
-      setStatus('error');
-      setMessage('승인되지 않은 이메일이에요.');
       return;
     }
 
@@ -77,7 +71,7 @@ export function LoginForm() {
         </p>
       ) : null}
       <p className="mt-4 text-center text-xs text-text-secondary">
-        허용된 이메일만 로그인할 수 있어요
+        굿모닝 친구들만 로그인할 수 있어요
       </p>
     </div>
   );
