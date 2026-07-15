@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/supabaseClient';
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'error'>('loading');
-  const [message, setMessage] = useState('Finishing sign in...');
+  const [message, setMessage] = useState('로그인 세션을 확인할 수 없어요. 다시 시도해주세요.');
   const supabase = createClient();
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export default function AuthCallbackPage() {
 
       if (error || !session?.user) {
         setStatus('error');
-        setMessage(error?.message ?? 'Unable to complete sign-in.');
+        setMessage(error?.message ?? '로그인 세션을 확인할 수 없어요. 다시 시도해주세요.');
         return;
       }
 
@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
   if (status === 'loading') {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10 text-text-primary">
-        <LoadingState message="Finalizing sign in..." />
+        <LoadingState message="로그인을 마무리하는 중이에요…" />
       </main>
     );
   }
@@ -42,9 +42,9 @@ export default function AuthCallbackPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10 text-text-primary">
       <ErrorState
-        title="Sign in failed"
+        title="로그인에 실패했어요"
         description={message}
-        actionLabel="Back to login"
+        actionLabel="로그인으로"
         onRetry={() => router.replace('/login')}
       />
     </main>
