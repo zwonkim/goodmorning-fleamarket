@@ -18,7 +18,7 @@ This is an MVP focused on simplicity.
 
 ## Core Features
 
--   Magic Link login (approved emails only)
+-   ID-style login backed by Supabase email/password auth
 -   Product upload
 -   Product detail
 -   Likes

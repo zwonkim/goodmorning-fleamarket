@@ -202,7 +202,7 @@ export default function HomePage() {
             href="/login"
             className="inline-flex w-full items-center justify-center rounded-button bg-sunny px-4 py-3 text-sm font-semibold text-text-primary shadow-soft transition hover:bg-sunny/90"
           >
-            매직링크로 입장하기
+            로그인하고 입장하기
           </Link>
         </div>
       ) : null}

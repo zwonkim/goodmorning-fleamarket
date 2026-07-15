@@ -2,73 +2,86 @@
 
 import * as React from 'react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/supabaseClient';
-import { authRedirectUrl } from '@/lib/auth';
+import { getProfile } from '@/lib/profile';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
+  const router = useRouter();
   const supabase = createClient();
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus('idle');
     setMessage('');
 
-    if (!email.trim()) {
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) {
       setStatus('error');
-      setMessage('이메일 주소를 입력해주세요.');
+      setMessage('이메일을 입력해주세요.');
+      return;
+    }
+
+    if (!password) {
+      setStatus('error');
+      setMessage('비밀번호를 입력해주세요.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: authRedirectUrl,
-      },
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
     });
 
     setIsSubmitting(false);
 
-    if (error) {
+    if (error || !data.user) {
       setStatus('error');
-      setMessage(error.message);
+      setMessage(error?.message ?? '이메일 또는 비밀번호가 올바르지 않아요.');
       return;
     }
 
-    setStatus('success');
-    setMessage('매직링크를 보냈어요. 메일함을 확인해주세요.');
+    const profile = await getProfile(data.user.id);
+    router.replace(profile ? '/' : '/setup');
   };
 
   return (
     <div>
-      <form className="space-y-3" onSubmit={handleSubmit}>
+      <form className="space-y-3" onSubmit={handleLogin}>
         <Input
           id="email"
           type="email"
-          aria-label="이메일 주소"
+          aria-label="이메일"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="이메일을 입력하세요"
+          autoCapitalize="none"
+          autoCorrect="off"
+        />
+        <Input
+          id="password"
+          type="password"
+          aria-label="비밀번호"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="비밀번호를 입력하세요"
         />
         <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting ? '링크 보내는 중…' : '링크 보내기'}
+          {isSubmitting ? '로그인하는 중…' : '로그인'}
         </Button>
       </form>
       {message ? (
-        <p
-          className={`mt-4 text-center text-sm ${
-            status === 'success' ? 'text-success' : 'text-danger'
-          }`}
-        >
-          {message}
-        </p>
+        <p className="mt-4 text-center text-sm text-danger">{message}</p>
       ) : null}
       <p className="mt-4 text-center text-xs text-text-secondary">
         굿모닝 친구들만 로그인할 수 있어요
