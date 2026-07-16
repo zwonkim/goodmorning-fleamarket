@@ -1,14 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Skeleton } from '@/components/common';
 import { getProfile } from '@/lib/profile';
 import { getFeaturedProducts } from '@/lib/products';
 import { createClient } from '@/lib/supabase/supabaseClient';
+import { cn } from '@/lib/utils';
+import { STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/types/product';
 import type { FeaturedProduct } from '@/lib/products';
 import type { Profile } from '@/types/profile';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
+
+const POPULAR_MIN_SCORE = 3;
+const POPULAR_LIMIT = 6;
 
 export default function HomePage() {
   const [loading, setLoading] = useState(true);
@@ -90,21 +95,30 @@ export default function HomePage() {
 
   const displayName = profile?.nickname ?? user?.email?.split('@')[0] ?? '친구';
 
+  const popularProducts = useMemo(() => {
+    return products
+      .filter((product) => product.likes + product.comments >= POPULAR_MIN_SCORE)
+      .sort((a, b) => b.likes + b.comments - (a.likes + a.comments))
+      .slice(0, POPULAR_LIMIT);
+  }, [products]);
+
   return (
     <main className="min-h-screen bg-white px-4 py-6 pb-28 text-text-primary">
       <header className="sticky top-0 z-20 mb-5 flex items-start justify-between bg-white pb-4 pt-6 -mt-6">
         <div>
           <p className="font-mochiy text-2xl tracking-[-0.03em] text-[#FFD966]">
-            Good
-            <br />
-            Morning
+            Good Morning
           </p>
-          <p className="mt-2 text-xs text-text-secondary">
-            {loading
-              ? '세션을 확인하는 중이에요'
-              : user
-                ? `반가워요 ${displayName}님 👋`
-                : '굿모닝 친구들만 들어올 수 있는 플리마켓'}
+          <p className="mt-2 text-sm text-text-secondary">
+            {loading ? (
+              '세션을 확인하는 중이에요'
+            ) : user ? (
+              <>
+                반가워요 <span className="font-bold text-text-primary">{displayName}</span>님 👋
+              </>
+            ) : (
+              '굿모닝 친구들만 들어올 수 있는 플리마켓'
+            )}
           </p>
         </div>
         <Link
@@ -146,10 +160,25 @@ export default function HomePage() {
         </div>
       </section>
 
+      {popularProducts.length > 0 ? (
+        <section className="mb-6">
+          <div className="mb-4">
+            <h1 className="text-lg font-extrabold tracking-[-0.03em]">🔥 인기 상품</h1>
+            <p className="text-xs text-text-secondary">좋아요와 댓글이 많은 상품이에요</p>
+          </div>
+
+          <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1">
+            {popularProducts.map((product) => (
+              <ProductCard key={product.id} product={product} className="w-36 shrink-0" />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-extrabold tracking-[-0.03em]">전체 상품</h1>
+            <h1 className="text-lg font-extrabold tracking-[-0.03em]">🛍️ 전체 상품</h1>
             <p className="text-xs text-text-secondary">친구들이 업로드한 상품을 확인해보세요</p>
           </div>
         </div>
@@ -174,43 +203,7 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-4">
             {products.map((product) => (
-              <Link key={product.id} href={`/products/${product.id}`} className="space-y-2">
-                <article className="space-y-2">
-                  <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[1.15rem] bg-[#efe6d6]">
-                    {product.thumbnailUrl ? (
-                      <img
-                        src={product.thumbnailUrl}
-                        alt={product.title}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <img
-                        src="/assets/mascot/sun_06_camera.svg"
-                        alt="Good Morning mascot"
-                        className="h-16 w-16"
-                      />
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="line-clamp-2 text-[0.82rem] font-semibold leading-5">
-                      {product.title}
-                    </h2>
-                    <p className="text-sm font-extrabold">
-                      {product.price.toLocaleString('ko-KR')}원
-                    </p>
-                    <div className="flex items-center gap-2 text-[0.78rem] text-text-secondary">
-                      <span className="flex items-center gap-1">
-                        <span className="text-[#ff6b57]">♥</span>
-                        <span>{product.likes}</span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span>💬</span>
-                        <span>{product.comments}</span>
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              </Link>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
@@ -235,6 +228,67 @@ export default function HomePage() {
         +
       </Link>
     </main>
+  );
+}
+
+function ProductCard({
+  product,
+  className,
+}: {
+  product: FeaturedProduct;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={`/products/${product.id}`}
+      className={className ? `space-y-2 ${className}` : 'space-y-2'}
+    >
+      <article className="space-y-2">
+        <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[1.15rem] bg-[#efe6d6]">
+          {product.thumbnailUrl ? (
+            <img
+              src={product.thumbnailUrl}
+              alt={product.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <img
+              src="/assets/mascot/sun_06_camera.svg"
+              alt="Good Morning mascot"
+              className="h-16 w-16"
+            />
+          )}
+        </div>
+        <div className="space-y-1">
+          <h2 className="line-clamp-2 text-[0.82rem] font-semibold leading-5">
+            {product.title}
+          </h2>
+          <div className="flex items-center gap-1.5">
+            {product.status !== 'for_sale' ? (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold',
+                  STATUS_BADGE_CLASSES[product.status],
+                )}
+              >
+                {STATUS_LABELS[product.status]}
+              </span>
+            ) : null}
+            <p className="text-sm font-extrabold">{product.price.toLocaleString('ko-KR')}원</p>
+          </div>
+          <div className="flex items-center gap-2 text-[0.78rem] text-text-secondary">
+            <span className="flex items-center gap-1">
+              <span className="text-[#ff6b57]">♥</span>
+              <span>{product.likes}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span>💬</span>
+              <span>{product.comments}</span>
+            </span>
+          </div>
+        </div>
+      </article>
+    </Link>
   );
 }
 
