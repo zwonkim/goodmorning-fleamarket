@@ -438,7 +438,7 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <p className="whitespace-pre-line text-sm leading-6 text-text-secondary">
+        <p className="whitespace-pre-line text-base leading-7 text-text-secondary">
           {product.description}
         </p>
 

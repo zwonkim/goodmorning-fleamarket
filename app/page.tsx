@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Avatar } from '@/components/common';
+import { Avatar, Skeleton } from '@/components/common';
 import { getProfile } from '@/lib/profile';
 import { getFeaturedProducts } from '@/lib/products';
 import { createClient } from '@/lib/supabase/supabaseClient';
@@ -92,7 +92,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white px-4 py-6 pb-28 text-text-primary">
-      <header className="mb-5 flex items-start justify-between">
+      <header className="sticky top-0 z-20 mb-5 flex items-start justify-between bg-white pb-4 pt-6 -mt-6">
         <div>
           <p className="font-mochiy text-2xl tracking-[-0.03em] text-[#FFD966]">
             Good
@@ -155,9 +155,18 @@ export default function HomePage() {
         </div>
 
         {productsLoading ? (
-          <p className="py-8 text-center text-xs text-text-secondary">
-            상품을 불러오는 중이에요
-          </p>
+          <div className="grid grid-cols-2 gap-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <Skeleton className="aspect-square w-full rounded-[1.15rem]" />
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : products.length === 0 ? (
           <p className="py-8 text-center text-xs text-text-secondary">
             아직 등록된 상품이 없어요
