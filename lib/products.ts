@@ -11,6 +11,13 @@ type CreateProductInput = {
   userId: string;
 };
 
+type UpdateProductInput = {
+  condition: ProductCondition;
+  description: string;
+  price: number;
+  title: string;
+};
+
 type UploadedImage = {
   path: string;
   sortOrder: number;
@@ -68,6 +75,56 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
   }
 
   return data;
+}
+
+export async function updateProduct(
+  productId: string,
+  input: UpdateProductInput,
+): Promise<Product> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      condition: input.condition,
+      description: input.description,
+      price: input.price,
+      title: input.title,
+    })
+    .eq('id', productId)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function deleteProductImages(
+  images: Pick<ProductImage, 'id' | 'storage_path'>[],
+): Promise<void> {
+  if (images.length === 0) {
+    return;
+  }
+
+  const supabase = createClient();
+  const storagePaths = images.map((image) => image.storage_path);
+
+  await supabase.storage.from(PRODUCT_BUCKET).remove(storagePaths);
+  await supabase
+    .from('product_images')
+    .delete()
+    .in('id', images.map((image) => image.id));
+}
+
+export async function removeProductImageFiles(paths: string[]): Promise<void> {
+  if (paths.length === 0) {
+    return;
+  }
+
+  const supabase = createClient();
+  await supabase.storage.from(PRODUCT_BUCKET).remove(paths);
 }
 
 export async function uploadProductImages(

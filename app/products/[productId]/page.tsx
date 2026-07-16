@@ -1,15 +1,15 @@
 'use client';
 
-import { ArrowLeft, Heart, Share2 } from 'lucide-react';
+import { ArrowLeft, Heart, Pencil, Share2, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Avatar, Button, CommentItem, EmptyState, ErrorState, LoadingState, TextArea } from '@/components/common';
 import { createComment, deleteComment, getComments } from '@/lib/comments';
 import { getLikeState, likeProduct, unlikeProduct } from '@/lib/likes';
-import { getProductDetail, getProductImageUrl } from '@/lib/products';
+import { deleteProduct, getProductDetail, getProductImageUrl } from '@/lib/products';
 import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/supabaseClient';
-import { cn } from '@/lib/utils';
+import { cn, formatRelativeDate } from '@/lib/utils';
 import { CONDITION_LABELS } from '@/types/product';
 import type { CommentWithAuthor } from '@/lib/comments';
 import type { LikeState } from '@/lib/likes';
@@ -31,6 +31,7 @@ export default function ProductDetailPage() {
   const [likePending, setLikePending] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [shareFeedback, setShareFeedback] = useState('');
+  const [deletingProduct, setDeletingProduct] = useState(false);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
@@ -221,6 +222,15 @@ export default function ProductDetailPage() {
     commentInputRef.current?.focus();
   };
 
+  useEffect(() => {
+    const textarea = commentInputRef.current;
+    if (!textarea) {
+      return;
+    }
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [commentContent]);
+
   const handleShare = async () => {
     const shareData = {
       title: product?.title ?? 'Good Morning',
@@ -247,6 +257,27 @@ export default function ProductDetailPage() {
     }
 
     setTimeout(() => setShareFeedback(''), 2000);
+  };
+
+  const handleEditProduct = () => {
+    router.push(`/products/${productId}/edit`);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (deletingProduct || !window.confirm('이 상품을 삭제할까요?')) {
+      return;
+    }
+
+    setDeletingProduct(true);
+
+    try {
+      await deleteProduct(productId);
+      router.replace('/');
+    } catch (error) {
+      console.error('Failed to delete product', error);
+      window.alert('상품 삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+      setDeletingProduct(false);
+    }
   };
 
   const handleCarouselScroll = (event: React.UIEvent<HTMLDivElement>) => {
@@ -301,6 +332,27 @@ export default function ProductDetailPage() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-1">
+          {userId && userId === product.user_id ? (
+            <>
+              <button
+                type="button"
+                onClick={handleEditProduct}
+                aria-label="상품 수정"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-cream"
+              >
+                <Pencil className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProduct}
+                disabled={deletingProduct}
+                aria-label="상품 삭제"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-cream disabled:opacity-50"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={handleShare}
@@ -378,9 +430,12 @@ export default function ProductDetailPage() {
               <span>{likeState.count}</span>
             </button>
           </div>
-          <span className="mt-3 inline-flex rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary">
-            {CONDITION_LABELS[product.condition]}
-          </span>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="inline-flex rounded-full border border-border px-3 py-1 text-xs font-medium text-text-secondary">
+              {CONDITION_LABELS[product.condition]}
+            </span>
+            <span className="text-xs text-text-secondary">{formatRelativeDate(product.created_at)}</span>
+          </div>
         </div>
 
         <p className="whitespace-pre-line text-sm leading-6 text-text-secondary">
@@ -439,7 +494,7 @@ export default function ProductDetailPage() {
                 onChange={(event) => setCommentContent(event.target.value)}
                 placeholder="댓글을 남겨보세요"
                 rows={1}
-                className="min-h-0 flex-1 resize-none py-2.5"
+                className="min-h-0 max-h-[160px] flex-1 resize-none overflow-y-auto py-2.5"
               />
               <Button
                 type="submit"
@@ -478,12 +533,9 @@ export default function ProductDetailPage() {
           type="button"
           onClick={handleToggleLike}
           disabled={likePending}
-          className={cn(
-            'flex w-full items-center justify-center gap-1.5 rounded-button px-4 py-3 text-sm font-semibold transition',
-            likeState.likedByUser ? 'bg-like/20 text-like' : 'bg-like/10 text-like',
-          )}
+          className="flex w-full items-center justify-center gap-1.5 rounded-button bg-like px-4 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-like/90"
         >
-          <Heart className={cn('h-4 w-4', likeState.likedByUser && 'fill-like')} />
+          <Heart className={cn('h-4 w-4', likeState.likedByUser && 'fill-white')} />
           좋아요
         </button>
       </div>

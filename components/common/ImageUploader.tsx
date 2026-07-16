@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 export type ImagePreviewItem = {
   id: string;
-  file: File;
+  file?: File;
   previewUrl: string;
 };
 

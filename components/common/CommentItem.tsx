@@ -1,7 +1,7 @@
 'use client';
 
 import { Avatar } from '@/components/common/Avatar';
-import { formatDateTime } from '@/lib/utils';
+import { formatRelativeDate } from '@/lib/utils';
 import type { CommentWithAuthor } from '@/lib/comments';
 
 interface CommentItemProps {
@@ -29,7 +29,7 @@ export function CommentItem({
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-sm font-semibold">{nickname}</p>
             <span className="shrink-0 text-xs text-text-secondary">
-              {formatDateTime(comment.created_at)}
+              {formatRelativeDate(comment.created_at)}
             </span>
           </div>
           {canDelete ? (

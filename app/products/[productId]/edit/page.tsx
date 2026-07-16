@@ -2,7 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Button,
   ErrorState,
@@ -13,14 +13,16 @@ import {
   TextArea,
 } from '@/components/common';
 import {
-  cleanupProductUpload,
-  createProduct,
   createProductImages,
+  deleteProductImages,
+  getProductDetail,
+  getProductImageUrl,
+  removeProductImageFiles,
+  updateProduct,
   uploadProductImages,
 } from '@/lib/products';
 import { createClient } from '@/lib/supabase/supabaseClient';
-import type { ImagePreviewItem } from '@/components/common/ImageUploader';
-import type { ProductCondition } from '@/types/product';
+import type { ProductCondition, ProductImage } from '@/types/product';
 
 const MAX_IMAGES = 10;
 const MIN_IMAGES = 1;
@@ -35,16 +37,24 @@ type FormState = {
 
 type FieldErrors = Partial<Record<'images' | keyof FormState, string>>;
 
-export default function NewProductPage() {
+type EditImageItem =
+  | { kind: 'existing'; id: string; storagePath: string; previewUrl: string }
+  | { kind: 'new'; id: string; file: File; previewUrl: string };
+
+export default function EditProductPage() {
+  const params = useParams<{ productId: string }>();
+  const productId = params.productId;
   const router = useRouter();
   const supabase = createClient();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [fatalError, setFatalError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [images, setImages] = useState<ImagePreviewItem[]>([]);
+  const [originalImages, setOriginalImages] = useState<ProductImage[]>([]);
+  const [imageItems, setImageItems] = useState<EditImageItem[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const imageUrlsRef = useRef<string[]>([]);
   const [form, setForm] = useState<FormState>({
@@ -57,39 +67,74 @@ export default function NewProductPage() {
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+    const load = async () => {
+      setLoading(true);
+      setNotFound(false);
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
       if (!mounted) {
         return;
       }
 
-      if (error) {
+      if (sessionError) {
         setFatalError('인증 정보를 확인하지 못했습니다. 다시 로그인해주세요.');
-        setAuthChecked(true);
+        setLoading(false);
         return;
       }
 
-      const user = data.session?.user;
-      if (!user) {
+      const currentUserId = sessionData.session?.user.id ?? null;
+
+      if (!currentUserId) {
         router.replace('/login');
         return;
       }
 
-      setUserId(user.id);
-      setAuthChecked(true);
+      const detail = await getProductDetail(productId);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!detail) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      if (detail.product.user_id !== currentUserId) {
+        router.replace(`/products/${productId}`);
+        return;
+      }
+
+      setForm({
+        condition: detail.product.condition,
+        description: detail.product.description,
+        price: String(detail.product.price),
+        title: detail.product.title,
+      });
+      setOriginalImages(detail.images);
+      setImageItems(
+        detail.images.map((image) => ({
+          kind: 'existing',
+          id: image.id,
+          storagePath: image.storage_path,
+          previewUrl: getProductImageUrl(image.storage_path),
+        })),
+      );
+      setLoading(false);
     };
 
-    checkSession();
+    load();
 
     return () => {
       mounted = false;
     };
-  }, [router, supabase.auth]);
+  }, [productId, router, supabase.auth]);
 
   useEffect(() => {
-    imageUrlsRef.current = images.map((image) => image.previewUrl);
-  }, [images]);
+    imageUrlsRef.current = imageItems.map((image) => image.previewUrl);
+  }, [imageItems]);
 
   useEffect(() => {
     return () => {
@@ -97,10 +142,7 @@ export default function NewProductPage() {
     };
   }, []);
 
-  const canSubmit = useMemo(
-    () => authChecked && !isSubmitting && !!userId,
-    [authChecked, isSubmitting, userId],
-  );
+  const canSubmit = useMemo(() => !loading && !isSubmitting, [loading, isSubmitting]);
 
   const updateForm = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -113,22 +155,23 @@ export default function NewProductPage() {
     setFieldErrors((current) => ({ ...current, images: undefined }));
 
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
-    const remaining = MAX_IMAGES - images.length;
+    const remaining = MAX_IMAGES - imageItems.length;
     const nextFiles = imageFiles.slice(0, remaining);
 
-    const nextImages = nextFiles.map((file) => ({
+    const nextItems: EditImageItem[] = nextFiles.map((file) => ({
+      kind: 'new',
       file,
       id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
       previewUrl: URL.createObjectURL(file),
     }));
 
-    setImages((current) => [...current, ...nextImages]);
+    setImageItems((current) => [...current, ...nextItems]);
   };
 
   const handleRemoveImage = (index: number) => {
-    setImages((current) => {
+    setImageItems((current) => {
       const target = current[index];
-      if (target) {
+      if (target?.kind === 'new') {
         URL.revokeObjectURL(target.previewUrl);
       }
 
@@ -142,9 +185,9 @@ export default function NewProductPage() {
     const nextErrors: FieldErrors = {};
     const priceNumber = Number(form.price);
 
-    if (images.length < MIN_IMAGES) {
+    if (imageItems.length < MIN_IMAGES) {
       nextErrors.images = `사진을 최소 ${MIN_IMAGES}장 등록해주세요.`;
-    } else if (images.length > MAX_IMAGES) {
+    } else if (imageItems.length > MAX_IMAGES) {
       nextErrors.images = `이미지는 최대 ${MAX_IMAGES}장까지 등록할 수 있어요.`;
     }
 
@@ -172,7 +215,7 @@ export default function NewProductPage() {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!canSubmit || !userId) {
+    if (!canSubmit) {
       return;
     }
 
@@ -184,35 +227,66 @@ export default function NewProductPage() {
       return;
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id ?? null;
+
+    if (!userId) {
+      router.replace('/login');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitSuccess('');
 
-    let createdProductId = '';
+    const newItems = imageItems.filter(
+      (item): item is Extract<EditImageItem, { kind: 'new' }> => item.kind === 'new',
+    );
     let uploadedPaths: string[] = [];
 
     try {
-      const product = await createProduct({
+      await updateProduct(productId, {
         condition: form.condition as ProductCondition,
         description: form.description.trim(),
         price: Number(form.price),
         title: form.title.trim(),
-        userId,
       });
 
-      createdProductId = product.id;
-
-      const uploadedImages = await uploadProductImages(
-        userId,
-        product.id,
-        images.map((image) => image.file).filter((file): file is File => file != null),
+      const removedImages = originalImages.filter(
+        (original) =>
+          !imageItems.some((item) => item.kind === 'existing' && item.id === original.id),
       );
 
-      uploadedPaths = uploadedImages.map((image) => image.path);
+      if (removedImages.length > 0) {
+        await deleteProductImages(removedImages);
+      }
 
-      await createProductImages(product.id, uploadedImages);
+      if (newItems.length > 0) {
+        const remainingSortOrders = originalImages
+          .filter((original) =>
+            imageItems.some((item) => item.kind === 'existing' && item.id === original.id),
+          )
+          .map((image) => image.sort_order);
+        const startOrder =
+          remainingSortOrders.length > 0 ? Math.max(...remainingSortOrders) + 1 : 0;
 
-      setSubmitSuccess('상품이 등록되었어요. 상세 페이지로 이동합니다.');
-      router.replace(`/products/${product.id}`);
+        const uploadedImages = await uploadProductImages(
+          userId,
+          productId,
+          newItems.map((item) => item.file),
+        );
+        uploadedPaths = uploadedImages.map((image) => image.path);
+
+        await createProductImages(
+          productId,
+          uploadedImages.map((image, index) => ({
+            ...image,
+            sortOrder: startOrder + index,
+          })),
+        );
+      }
+
+      setSubmitSuccess('상품 정보를 수정했어요. 상세 페이지로 이동합니다.');
+      router.replace(`/products/${productId}`);
     } catch (error) {
       const uploadedFromError =
         typeof error === 'object' &&
@@ -226,14 +300,14 @@ export default function NewProductPage() {
         uploadedPaths = uploadedFromError;
       }
 
-      if (createdProductId) {
-        await cleanupProductUpload(createdProductId, uploadedPaths);
+      if (uploadedPaths.length > 0) {
+        await removeProductImageFiles(uploadedPaths);
       }
 
       const message =
         error instanceof Error
           ? error.message
-          : '상품 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+          : '상품 수정 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
 
       setSubmitError(message);
     } finally {
@@ -241,10 +315,23 @@ export default function NewProductPage() {
     }
   };
 
-  if (!authChecked) {
+  if (loading) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10 text-text-primary">
-        <LoadingState message="업로드 화면을 준비하는 중이에요…" />
+        <LoadingState message="상품 정보를 불러오는 중이에요…" />
+      </main>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10 text-text-primary">
+        <ErrorState
+          title="상품을 찾을 수 없어요"
+          description="삭제되었거나 존재하지 않는 상품이에요."
+          actionLabel="홈으로"
+          onRetry={() => router.replace('/')}
+        />
       </main>
     );
   }
@@ -253,10 +340,10 @@ export default function NewProductPage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10 text-text-primary">
         <ErrorState
-          title="업로드를 시작할 수 없어요"
+          title="수정 화면을 열 수 없어요"
           description={fatalError}
-          actionLabel="로그인으로"
-          onRetry={() => router.replace('/login')}
+          actionLabel="다시 시도"
+          onRetry={() => window.location.reload()}
         />
       </main>
     );
@@ -267,13 +354,13 @@ export default function NewProductPage() {
       <header className="mb-6 flex items-center gap-3">
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={() => router.back()}
           aria-label="뒤로 가기"
           className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-cream"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-lg font-bold">상품 등록</h1>
+        <h1 className="text-lg font-bold">상품 수정</h1>
       </header>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
@@ -282,7 +369,7 @@ export default function NewProductPage() {
             사진 등록 (최소 {MIN_IMAGES}장)
           </label>
           <ImageUploader
-            images={images}
+            images={imageItems}
             maxImages={MAX_IMAGES}
             disabled={isSubmitting}
             error={fieldErrors.images}
@@ -387,7 +474,7 @@ export default function NewProductPage() {
         ) : null}
 
         <Button type="submit" disabled={!canSubmit} className="w-full">
-          {isSubmitting ? '등록 중…' : '등록하기'}
+          {isSubmitting ? '수정 중…' : '수정하기'}
         </Button>
       </form>
     </main>

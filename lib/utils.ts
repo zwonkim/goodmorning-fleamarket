@@ -5,15 +5,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDateTime(iso: string): string {
+export function formatRelativeDate(iso: string): string {
   const date = new Date(iso);
-  const pad = (value: number) => value.toString().padStart(2, '0');
+  const now = new Date();
+  const startOfDay = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate());
 
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
+  const isToday = startOfDay(date).getTime() === startOfDay(now).getTime();
 
-  return `${year}.${month}.${day} ${hours}:${minutes}`;
+  if (isToday) {
+    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+    if (diffMinutes < 1) {
+      return '방금 전';
+    }
+    if (diffMinutes < 60) {
+      return `${diffMinutes}분 전`;
+    }
+    return `${Math.floor(diffMinutes / 60)}시간 전`;
+  }
+
+  const diffDays = Math.round(
+    (startOfDay(now).getTime() - startOfDay(date).getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  return `${diffDays}일 전`;
 }

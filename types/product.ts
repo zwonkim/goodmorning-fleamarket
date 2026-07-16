@@ -13,6 +13,7 @@ export type Product = {
   price: number;
   condition: ProductCondition;
   description: string;
+  created_at: string;
 };
 
 export type ProductImage = {
