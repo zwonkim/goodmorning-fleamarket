@@ -1,5 +1,6 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
 import { formatRelativeDate } from '@/lib/utils';
 import type { CommentWithAuthor } from '@/lib/comments';
@@ -21,6 +22,12 @@ export function CommentItem({
 }: CommentItemProps) {
   const nickname = comment.author?.nickname ?? '알 수 없음';
 
+  const mentionMatch = /^@(\S+)\s/.exec(comment.content);
+  const mention = mentionMatch ? `@${mentionMatch[1]}` : null;
+  const contentWithoutMention = mentionMatch
+    ? comment.content.slice(mentionMatch[0].length)
+    : comment.content;
+
   return (
     <div className="flex gap-3 py-3">
       <Avatar src={comment.author?.avatar_url} nickname={nickname} size="sm" />
@@ -37,14 +44,22 @@ export function CommentItem({
               type="button"
               onClick={onDelete}
               disabled={deletePending}
-              className="shrink-0 text-xs text-text-secondary transition hover:text-danger disabled:opacity-50"
+              aria-label="댓글 삭제"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-text-secondary transition hover:text-danger disabled:opacity-50"
             >
-              삭제
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
           ) : null}
         </div>
         <p className="mt-1 whitespace-pre-line text-sm leading-6 text-text-primary">
-          {comment.content}
+          {mention ? (
+            <>
+              <span className="mr-1 font-bold">{mention}</span>
+              {contentWithoutMention}
+            </>
+          ) : (
+            comment.content
+          )}
         </p>
         <button
           type="button"
