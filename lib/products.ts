@@ -26,6 +26,7 @@ export type FeaturedProduct = {
   title: string;
   price: number;
   likes: number;
+  comments: number;
   thumbnailUrl: string | null;
 };
 
@@ -35,6 +36,7 @@ export type ProductSummary = {
   price: number;
   condition: ProductCondition;
   likes: number;
+  comments: number;
   thumbnailUrl: string | null;
 };
 
@@ -149,15 +151,19 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
 
   const productIds = products.map((product: Pick<Product, 'id'>) => product.id);
 
-  const [{ data: images, error: imagesError }, { data: likes, error: likesError }] =
-    await Promise.all([
-      supabase
-        .from('product_images')
-        .select('product_id, storage_path, sort_order')
-        .in('product_id', productIds)
-        .order('sort_order', { ascending: true }),
-      supabase.from('likes').select('product_id').in('product_id', productIds),
-    ]);
+  const [
+    { data: images, error: imagesError },
+    { data: likes, error: likesError },
+    { data: comments, error: commentsError },
+  ] = await Promise.all([
+    supabase
+      .from('product_images')
+      .select('product_id, storage_path, sort_order')
+      .in('product_id', productIds)
+      .order('sort_order', { ascending: true }),
+    supabase.from('likes').select('product_id').in('product_id', productIds),
+    supabase.from('comments').select('product_id').in('product_id', productIds),
+  ]);
 
   if (imagesError) {
     console.error('Failed to load product images', imagesError);
@@ -165,9 +171,13 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
   if (likesError) {
     console.error('Failed to load product likes', likesError);
   }
+  if (commentsError) {
+    console.error('Failed to load product comments', commentsError);
+  }
 
   type ImageRow = Pick<ProductImage, 'product_id' | 'storage_path'>;
   type LikeRow = { product_id: string };
+  type CommentRow = { product_id: string };
 
   return products.map((product: Pick<Product, 'id' | 'title' | 'price'>) => {
     const thumbnailPath = (images as ImageRow[] | null)?.find(
@@ -175,12 +185,16 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
     )?.storage_path;
     const likeCount =
       (likes as LikeRow[] | null)?.filter((like) => like.product_id === product.id).length ?? 0;
+    const commentCount =
+      (comments as CommentRow[] | null)?.filter((comment) => comment.product_id === product.id)
+        .length ?? 0;
 
     return {
       id: product.id,
       title: product.title,
       price: product.price,
       likes: likeCount,
+      comments: commentCount,
       thumbnailUrl: thumbnailPath ? getProductImageUrl(thumbnailPath) : null,
     };
   });
@@ -196,15 +210,19 @@ async function toProductSummaries(
   const supabase = createClient();
   const productIds = productRows.map((product) => product.id);
 
-  const [{ data: images, error: imagesError }, { data: likes, error: likesError }] =
-    await Promise.all([
-      supabase
-        .from('product_images')
-        .select('product_id, storage_path, sort_order')
-        .in('product_id', productIds)
-        .order('sort_order', { ascending: true }),
-      supabase.from('likes').select('product_id').in('product_id', productIds),
-    ]);
+  const [
+    { data: images, error: imagesError },
+    { data: likes, error: likesError },
+    { data: comments, error: commentsError },
+  ] = await Promise.all([
+    supabase
+      .from('product_images')
+      .select('product_id, storage_path, sort_order')
+      .in('product_id', productIds)
+      .order('sort_order', { ascending: true }),
+    supabase.from('likes').select('product_id').in('product_id', productIds),
+    supabase.from('comments').select('product_id').in('product_id', productIds),
+  ]);
 
   if (imagesError) {
     console.error('Failed to load product images', imagesError);
@@ -212,9 +230,13 @@ async function toProductSummaries(
   if (likesError) {
     console.error('Failed to load product likes', likesError);
   }
+  if (commentsError) {
+    console.error('Failed to load product comments', commentsError);
+  }
 
   type ImageRow = Pick<ProductImage, 'product_id' | 'storage_path'>;
   type LikeRow = { product_id: string };
+  type CommentRow = { product_id: string };
 
   return productRows.map((product) => {
     const thumbnailPath = (images as ImageRow[] | null)?.find(
@@ -222,6 +244,9 @@ async function toProductSummaries(
     )?.storage_path;
     const likeCount =
       (likes as LikeRow[] | null)?.filter((like) => like.product_id === product.id).length ?? 0;
+    const commentCount =
+      (comments as CommentRow[] | null)?.filter((comment) => comment.product_id === product.id)
+        .length ?? 0;
 
     return {
       id: product.id,
@@ -229,6 +254,7 @@ async function toProductSummaries(
       price: product.price,
       condition: product.condition,
       likes: likeCount,
+      comments: commentCount,
       thumbnailUrl: thumbnailPath ? getProductImageUrl(thumbnailPath) : null,
     };
   });

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LoadingState } from '@/components/common';
+import { Avatar, LoadingState } from '@/components/common';
 import { deleteProduct, getLikedProducts, getProductsByUser } from '@/lib/products';
 import { unlikeProduct } from '@/lib/likes';
 import { getProfile } from '@/lib/profile';
@@ -118,13 +118,7 @@ export default function MyPage() {
       </header>
 
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-cream">
-          <img
-            src="/assets/mascot/sun_01_base.svg"
-            alt="Good Morning mascot"
-            className="h-9 w-9"
-          />
-        </div>
+        <Avatar src={profile?.avatar_url} nickname={profile?.nickname ?? '친구'} size="md" />
         <p className="text-lg font-bold">{profile?.nickname ?? '친구'}</p>
       </div>
 
@@ -185,6 +179,10 @@ export default function MyPage() {
                     <span className="flex items-center gap-1">
                       <span className="text-[#ff6b57]">♥</span>
                       {product.likes}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span>💬</span>
+                      {product.comments}
                     </span>
                   </div>
                 </div>

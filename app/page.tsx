@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { Avatar } from '@/components/common';
 import { getProfile } from '@/lib/profile';
 import { getFeaturedProducts } from '@/lib/products';
 import { createClient } from '@/lib/supabase/supabaseClient';
@@ -109,9 +110,13 @@ export default function HomePage() {
         <Link
           href="/mypage"
           aria-label="마이페이지"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-white shadow-soft"
+          className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-border bg-white shadow-soft"
         >
-          <UserIcon />
+          {user ? (
+            <Avatar src={profile?.avatar_url} nickname={displayName} size="md" className="h-10 w-10" />
+          ) : (
+            <UserIcon />
+          )}
         </Link>
       </header>
 
@@ -184,9 +189,15 @@ export default function HomePage() {
                     <p className="text-sm font-extrabold">
                       {product.price.toLocaleString('ko-KR')}원
                     </p>
-                    <div className="flex items-center gap-1 text-[0.78rem] text-text-secondary">
-                      <span className="text-[#ff6b57]">♥</span>
-                      <span>{product.likes}</span>
+                    <div className="flex items-center gap-2 text-[0.78rem] text-text-secondary">
+                      <span className="flex items-center gap-1">
+                        <span className="text-[#ff6b57]">♥</span>
+                        <span>{product.likes}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span>💬</span>
+                        <span>{product.comments}</span>
+                      </span>
                     </div>
                   </div>
                 </article>

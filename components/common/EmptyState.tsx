@@ -13,7 +13,7 @@ export function EmptyState({ title, description, actionLabel, onAction }: EmptyS
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-6 text-center">
       <img
-        src="/assets/mascot/sun_10_package.svg"
+        src="/assets/mascot/sun_05_heart.svg"
         alt="Good Morning mascot"
         className="h-32 w-32"
       />

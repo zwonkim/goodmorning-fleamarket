@@ -3,13 +3,15 @@
 import { ArrowLeft, Heart, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ErrorState, LoadingState } from '@/components/common';
+import { Avatar, Button, CommentItem, EmptyState, ErrorState, LoadingState, TextArea } from '@/components/common';
+import { createComment, deleteComment, getComments } from '@/lib/comments';
 import { getLikeState, likeProduct, unlikeProduct } from '@/lib/likes';
 import { getProductDetail, getProductImageUrl } from '@/lib/products';
 import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { cn } from '@/lib/utils';
 import { CONDITION_LABELS } from '@/types/product';
+import type { CommentWithAuthor } from '@/lib/comments';
 import type { LikeState } from '@/lib/likes';
 import type { Product, ProductImage } from '@/types/product';
 import type { Profile } from '@/types/profile';
@@ -30,7 +32,17 @@ export default function ProductDetailPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [shareFeedback, setShareFeedback] = useState('');
 
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [comments, setComments] = useState<CommentWithAuthor[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentContent, setCommentContent] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentSubmitError, setCommentSubmitError] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [commentDeleteError, setCommentDeleteError] = useState(false);
+
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -63,9 +75,10 @@ export default function ProductDetailPage() {
       setProduct(detail.product);
       setImages(detail.images);
 
-      const [sellerProfile, likeStateResult] = await Promise.all([
+      const [sellerProfile, likeStateResult, currentProfile] = await Promise.all([
         getProfile(detail.product.user_id),
         getLikeState(productId, currentUserId),
+        currentUserId ? getProfile(currentUserId) : Promise.resolve(null),
       ]);
 
       if (!mounted) {
@@ -74,10 +87,33 @@ export default function ProductDetailPage() {
 
       setSeller(sellerProfile);
       setLikeState(likeStateResult);
+      setProfile(currentProfile);
       setLoading(false);
     };
 
     load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [productId]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadComments = async () => {
+      setCommentsLoading(true);
+      const result = await getComments(productId);
+
+      if (!mounted) {
+        return;
+      }
+
+      setComments(result);
+      setCommentsLoading(false);
+    };
+
+    loadComments();
 
     return () => {
       mounted = false;
@@ -115,6 +151,74 @@ export default function ProductDetailPage() {
     } finally {
       setLikePending(false);
     }
+  };
+
+  const submitComment = async (content: string) => {
+    if (!userId || !content || commentSubmitting) {
+      return;
+    }
+
+    setCommentSubmitting(true);
+    setCommentSubmitError(false);
+
+    try {
+      const created = await createComment(productId, userId, content);
+      setComments((current) => [
+        ...current,
+        {
+          ...created,
+          author: profile
+            ? { id: profile.id, nickname: profile.nickname, avatar_url: profile.avatar_url ?? null }
+            : null,
+        },
+      ]);
+      setCommentContent('');
+    } catch (error) {
+      console.error('Failed to create comment', error);
+      setCommentSubmitError(true);
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const handleSubmitComment = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!userId) {
+      router.push('/login');
+      return;
+    }
+
+    submitComment(commentContent.trim());
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!userId || deletingCommentId) {
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+    setCommentDeleteError(false);
+
+    try {
+      await deleteComment(commentId, userId);
+      setComments((current) => current.filter((comment) => comment.id !== commentId));
+    } catch (error) {
+      console.error('Failed to delete comment', error);
+      setCommentDeleteError(true);
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  const handleReplyToComment = (nickname: string) => {
+    if (!userId) {
+      router.push('/login');
+      return;
+    }
+
+    setCommentContent((current) => `@${nickname} ${current}`);
+    commentInputRef.current?.focus();
   };
 
   const handleShare = async () => {
@@ -284,16 +388,88 @@ export default function ProductDetailPage() {
         </p>
 
         <div className="flex items-center gap-3 border-t border-border pt-4">
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-cream">
-            <img
-              src="/assets/mascot/sun_12_thumbs.svg"
-              alt="Good Morning mascot"
-              className="h-10 w-10"
-            />
-          </div>
+          <Avatar src={seller?.avatar_url} nickname={seller?.nickname ?? '알 수 없음'} size="md" />
           <div>
             <p className="text-sm font-semibold">{seller?.nickname ?? '알 수 없음'}</p>
           </div>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <h2 className="text-sm font-bold">댓글 {comments.length}</h2>
+
+          {commentsLoading ? (
+            <div className="py-6">
+              <LoadingState message="댓글을 불러오는 중이에요…" />
+            </div>
+          ) : comments.length === 0 ? (
+            <div className="py-6">
+              <EmptyState title="아직 댓글이 없어요" description="첫 댓글을 남겨보세요." />
+            </div>
+          ) : (
+            <div className="mt-1 divide-y divide-border">
+              {comments.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  canDelete={comment.user_id === userId}
+                  deletePending={deletingCommentId === comment.id}
+                  onDelete={() => handleDeleteComment(comment.id)}
+                  onReply={() => handleReplyToComment(comment.author?.nickname ?? '알 수 없음')}
+                />
+              ))}
+            </div>
+          )}
+
+          {commentDeleteError ? (
+            <div className="py-4">
+              <ErrorState
+                title="댓글 삭제에 실패했어요"
+                description="잠시 후 다시 시도해주세요."
+                actionLabel="닫기"
+                onRetry={() => setCommentDeleteError(false)}
+              />
+            </div>
+          ) : null}
+
+          {userId ? (
+            <form onSubmit={handleSubmitComment} className="mt-4 flex items-end gap-2">
+              <TextArea
+                ref={commentInputRef}
+                value={commentContent}
+                onChange={(event) => setCommentContent(event.target.value)}
+                placeholder="댓글을 남겨보세요"
+                rows={1}
+                className="min-h-0 flex-1 resize-none py-2.5"
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={commentSubmitting || commentContent.trim().length === 0}
+                className="shrink-0 px-4 py-2.5"
+              >
+                {commentSubmitting ? '등록 중…' : '등록'}
+              </Button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              className="mt-4 w-full rounded-button border border-border py-3 text-sm font-semibold text-text-secondary transition hover:bg-cream"
+            >
+              로그인 후 댓글을 남길 수 있어요
+            </button>
+          )}
+
+          {commentSubmitError ? (
+            <div className="py-4">
+              <ErrorState
+                title="댓글 등록에 실패했어요"
+                description="잠시 후 다시 시도해주세요."
+                actionLabel="다시 시도"
+                onRetry={() => submitComment(commentContent.trim())}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

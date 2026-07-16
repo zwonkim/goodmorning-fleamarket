@@ -4,3 +4,4 @@ export type RootLayoutProps = {
 
 export * from '@/types/profile';
 export * from '@/types/product';
+export * from '@/types/comment';

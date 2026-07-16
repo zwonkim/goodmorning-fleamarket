@@ -7,3 +7,5 @@ export * from '@/components/common/EmptyState';
 export * from '@/components/common/LoadingState';
 export * from '@/components/common/ErrorState';
 export * from '@/components/common/Spinner';
+export * from '@/components/common/Avatar';
+export * from '@/components/common/CommentItem';
