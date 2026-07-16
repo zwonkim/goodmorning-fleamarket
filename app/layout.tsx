@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Mochiy_Pop_P_One } from 'next/font/google';
 import { SITE_URL } from '@/lib/auth';
 import './globals.css';
@@ -11,6 +11,12 @@ const mochiyPopPOne = Mochiy_Pop_P_One({
 
 const title = 'Good Morning';
 const description = '굿모닝 바자회';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
