@@ -1,11 +1,13 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Skeleton } from '@/components/common';
 import { getProfile } from '@/lib/profile';
 import { getFeaturedProducts } from '@/lib/products';
+import { REVIEWS } from '@/lib/reviews';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { cn } from '@/lib/utils';
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/types/product';
@@ -202,6 +204,36 @@ export default function HomePage() {
               <ProductCard key={product.id} product={product} className="w-36 shrink-0" />
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {REVIEWS.length > 0 ? (
+        <section className="mb-6">
+          <div className="mb-4">
+            <h1 className="text-lg font-extrabold tracking-[-0.03em]">💌 거래 후기</h1>
+            <p className="text-xs text-text-secondary">친구로부터 도착한 생생한 거래 후기예요</p>
+          </div>
+
+          <Link
+            href={`/reviews/${REVIEWS[0].id}`}
+            className="flex gap-3 rounded-[1.15rem] border border-border p-3 shadow-soft"
+          >
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[0.85rem] bg-cream">
+              <img
+                src={REVIEWS[0].images[0]}
+                alt={REVIEWS[0].title}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="line-clamp-1 text-sm font-bold">{REVIEWS[0].title}</h2>
+              <p className="mt-1 line-clamp-2 text-xs text-text-secondary">{REVIEWS[0].content}</p>
+              <span className="mt-2 inline-flex items-center gap-0.5 text-xs font-semibold text-text-secondary">
+                더보기
+                <ChevronRight className="h-3.5 w-3.5" />
+              </span>
+            </div>
+          </Link>
         </section>
       ) : null}
 
