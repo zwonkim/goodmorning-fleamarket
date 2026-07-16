@@ -5,14 +5,21 @@ import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Avatar, LoadingState } from '@/components/common';
-import { deleteProduct, getLikedProducts, getProductsByUser } from '@/lib/products';
+import { getLikedProducts, getProductsByUser, updateProductStatus } from '@/lib/products';
 import { unlikeProduct } from '@/lib/likes';
 import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { cn } from '@/lib/utils';
-import { CONDITION_LABELS } from '@/types/product';
+import {
+  CONDITION_LABELS,
+  STATUS_BADGE_CLASSES,
+  STATUS_CHANGE_LABELS,
+  STATUS_LABELS,
+  STATUS_ORDER,
+} from '@/types/product';
 import type { ProductSummary } from '@/lib/products';
 import type { Profile } from '@/types/profile';
+import type { ProductStatus } from '@/types/product';
 
 type Tab = 'mine' | 'liked';
 
@@ -24,6 +31,20 @@ export default function MyPage() {
   const [tab, setTab] = useState<Tab>('mine');
   const [myProducts, setMyProducts] = useState<ProductSummary[]>([]);
   const [likedProducts, setLikedProducts] = useState<ProductSummary[]>([]);
+  const [statusMenuProductId, setStatusMenuProductId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!statusMenuProductId) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [statusMenuProductId]);
 
   useEffect(() => {
     let mounted = true;
@@ -66,17 +87,20 @@ export default function MyPage() {
     };
   }, [router]);
 
-  const handleDeleteProduct = async (productId: string) => {
-    if (!window.confirm('이 상품을 삭제할까요?')) {
-      return;
-    }
+  const handleStatusChange = async (productId: string, status: ProductStatus) => {
+    setStatusMenuProductId(null);
+
+    const previous = myProducts;
+    setMyProducts((current) =>
+      current.map((product) => (product.id === productId ? { ...product, status } : product)),
+    );
 
     try {
-      await deleteProduct(productId);
-      setMyProducts((current) => current.filter((product) => product.id !== productId));
+      await updateProductStatus(productId, status);
     } catch (error) {
-      console.error('Failed to delete product', error);
-      window.alert('상품 삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+      console.error('Failed to update product status', error);
+      window.alert('상태 변경에 실패했어요. 잠시 후 다시 시도해주세요.');
+      setMyProducts(previous);
     }
   };
 
@@ -102,6 +126,7 @@ export default function MyPage() {
   }
 
   const activeList = tab === 'mine' ? myProducts : likedProducts;
+  const statusMenuProduct = myProducts.find((product) => product.id === statusMenuProductId) ?? null;
 
   return (
     <main className="min-h-screen bg-white px-4 py-6 text-text-primary">
@@ -171,7 +196,19 @@ export default function MyPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{product.title}</p>
-                  <p className="text-sm font-bold">{product.price.toLocaleString('ko-KR')}원</p>
+                  <div className="flex items-center gap-1.5">
+                    {product.status !== 'for_sale' ? (
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[0.7rem] font-semibold',
+                          STATUS_BADGE_CLASSES[product.status],
+                        )}
+                      >
+                        {STATUS_LABELS[product.status]}
+                      </span>
+                    ) : null}
+                    <p className="text-sm font-bold">{product.price.toLocaleString('ko-KR')}원</p>
+                  </div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-text-secondary">
                     <span className="rounded-full border border-border px-2 py-0.5">
                       {CONDITION_LABELS[product.condition]}
@@ -190,9 +227,9 @@ export default function MyPage() {
               <button
                 type="button"
                 onClick={() =>
-                  tab === 'mine' ? handleDeleteProduct(product.id) : handleUnlike(product.id)
+                  tab === 'mine' ? setStatusMenuProductId(product.id) : handleUnlike(product.id)
                 }
-                aria-label={tab === 'mine' ? '상품 삭제' : '찜 해제'}
+                aria-label={tab === 'mine' ? '상태 변경' : '찜 해제'}
                 className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-text-secondary transition hover:bg-cream"
               >
                 <MoreHorizontal className="h-4 w-4" />
@@ -201,6 +238,43 @@ export default function MyPage() {
           ))}
         </ul>
       )}
+
+      {statusMenuProduct ? (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={() => setStatusMenuProductId(null)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="absolute inset-x-0 bottom-0 space-y-2 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            <div className="overflow-hidden rounded-2xl bg-white">
+              {STATUS_ORDER.filter((status) => status !== statusMenuProduct.status).map(
+                (status, index) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => handleStatusChange(statusMenuProduct.id, status)}
+                    className={cn(
+                      'block w-full py-3.5 text-center text-[0.95rem] font-medium text-[#007aff]',
+                      index > 0 && 'border-t border-border',
+                    )}
+                  >
+                    {STATUS_CHANGE_LABELS[status]}
+                  </button>
+                ),
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusMenuProductId(null)}
+              className="w-full rounded-2xl bg-white py-3.5 text-center text-[0.95rem] font-semibold text-text-primary"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

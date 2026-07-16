@@ -195,6 +195,7 @@ export default function NewProductPage() {
         condition: form.condition as ProductCondition,
         description: form.description.trim(),
         price: Number(form.price),
+        status: 'for_sale',
         title: form.title.trim(),
         userId,
       });

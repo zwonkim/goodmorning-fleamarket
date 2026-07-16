@@ -22,7 +22,7 @@ import {
   uploadProductImages,
 } from '@/lib/products';
 import { createClient } from '@/lib/supabase/supabaseClient';
-import type { ProductCondition, ProductImage } from '@/types/product';
+import type { ProductCondition, ProductImage, ProductStatus } from '@/types/product';
 
 const MAX_IMAGES = 10;
 const MIN_IMAGES = 1;
@@ -57,6 +57,7 @@ export default function EditProductPage() {
   const [imageItems, setImageItems] = useState<EditImageItem[]>([]);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const imageUrlsRef = useRef<string[]>([]);
+  const [status, setStatus] = useState<ProductStatus>('for_sale');
   const [form, setForm] = useState<FormState>({
     condition: '',
     description: '',
@@ -113,6 +114,7 @@ export default function EditProductPage() {
         price: String(detail.product.price),
         title: detail.product.title,
       });
+      setStatus(detail.product.status);
       setOriginalImages(detail.images);
       setImageItems(
         detail.images.map((image) => ({
@@ -248,6 +250,7 @@ export default function EditProductPage() {
         condition: form.condition as ProductCondition,
         description: form.description.trim(),
         price: Number(form.price),
+        status,
         title: form.title.trim(),
       });
 

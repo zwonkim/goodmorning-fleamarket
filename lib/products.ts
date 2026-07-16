@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/supabaseClient';
-import type { Product, ProductCondition, ProductImage } from '@/types/product';
+import type { Product, ProductCondition, ProductImage, ProductStatus } from '@/types/product';
 
 const PRODUCT_BUCKET = 'product-images';
 
@@ -7,6 +7,7 @@ type CreateProductInput = {
   condition: ProductCondition;
   description: string;
   price: number;
+  status: ProductStatus;
   title: string;
   userId: string;
 };
@@ -15,6 +16,7 @@ type UpdateProductInput = {
   condition: ProductCondition;
   description: string;
   price: number;
+  status: ProductStatus;
   title: string;
 };
 
@@ -32,6 +34,7 @@ export type FeaturedProduct = {
   id: string;
   title: string;
   price: number;
+  status: ProductStatus;
   likes: number;
   comments: number;
   thumbnailUrl: string | null;
@@ -41,6 +44,7 @@ export type ProductSummary = {
   id: string;
   title: string;
   price: number;
+  status: ProductStatus;
   condition: ProductCondition;
   likes: number;
   comments: number;
@@ -64,6 +68,7 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
       condition: input.condition,
       description: input.description,
       price: input.price,
+      status: input.status,
       title: input.title,
       user_id: input.userId,
     })
@@ -88,6 +93,7 @@ export async function updateProduct(
       condition: input.condition,
       description: input.description,
       price: input.price,
+      status: input.status,
       title: input.title,
     })
     .eq('id', productId)
@@ -99,6 +105,18 @@ export async function updateProduct(
   }
 
   return data;
+}
+
+export async function updateProductStatus(
+  productId: string,
+  status: ProductStatus,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from('products').update({ status }).eq('id', productId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function deleteProductImages(
@@ -199,7 +217,7 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
   const supabase = createClient();
   const { data: products, error: productsError } = await supabase
     .from('products')
-    .select('id, title, price')
+    .select('id, title, price, status')
     .order('created_at', { ascending: false });
 
   if (productsError || !products || products.length === 0) {
@@ -236,7 +254,7 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
   type LikeRow = { product_id: string };
   type CommentRow = { product_id: string };
 
-  return products.map((product: Pick<Product, 'id' | 'title' | 'price'>) => {
+  return products.map((product: Pick<Product, 'id' | 'title' | 'price' | 'status'>) => {
     const thumbnailPath = (images as ImageRow[] | null)?.find(
       (image) => image.product_id === product.id,
     )?.storage_path;
@@ -250,6 +268,7 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
       id: product.id,
       title: product.title,
       price: product.price,
+      status: product.status,
       likes: likeCount,
       comments: commentCount,
       thumbnailUrl: thumbnailPath ? getProductImageUrl(thumbnailPath) : null,
@@ -258,7 +277,7 @@ export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
 }
 
 async function toProductSummaries(
-  productRows: Pick<Product, 'id' | 'title' | 'price' | 'condition'>[],
+  productRows: Pick<Product, 'id' | 'title' | 'price' | 'condition' | 'status'>[],
 ): Promise<ProductSummary[]> {
   if (productRows.length === 0) {
     return [];
@@ -309,6 +328,7 @@ async function toProductSummaries(
       id: product.id,
       title: product.title,
       price: product.price,
+      status: product.status,
       condition: product.condition,
       likes: likeCount,
       comments: commentCount,
@@ -321,7 +341,7 @@ export async function getProductsByUser(userId: string): Promise<ProductSummary[
   const supabase = createClient();
   const { data, error } = await supabase
     .from('products')
-    .select('id, title, price, condition')
+    .select('id, title, price, condition, status')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -347,7 +367,7 @@ export async function getLikedProducts(userId: string): Promise<ProductSummary[]
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, title, price, condition')
+    .select('id, title, price, condition, status')
     .in('id', productIds);
 
   if (error || !data) {

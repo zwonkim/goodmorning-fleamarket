@@ -10,7 +10,7 @@ import { deleteProduct, getProductDetail, getProductImageUrl } from '@/lib/produ
 import { getProfile } from '@/lib/profile';
 import { createClient } from '@/lib/supabase/supabaseClient';
 import { cn, formatRelativeDate } from '@/lib/utils';
-import { CONDITION_LABELS } from '@/types/product';
+import { CONDITION_LABELS, STATUS_BADGE_CLASSES, STATUS_LABELS } from '@/types/product';
 import type { CommentWithAuthor } from '@/lib/comments';
 import type { LikeState } from '@/lib/likes';
 import type { Product, ProductImage } from '@/types/product';
@@ -414,7 +414,19 @@ export default function ProductDetailPage() {
         <div>
           <h1 className="text-lg font-bold">{product.title}</h1>
           <div className="mt-2 flex items-center justify-between">
-            <p className="text-xl font-extrabold">{product.price.toLocaleString('ko-KR')}원</p>
+            <div className="flex items-center gap-2">
+              {product.status !== 'for_sale' ? (
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-semibold',
+                    STATUS_BADGE_CLASSES[product.status],
+                  )}
+                >
+                  {STATUS_LABELS[product.status]}
+                </span>
+              ) : null}
+              <p className="text-xl font-extrabold">{product.price.toLocaleString('ko-KR')}원</p>
+            </div>
             <button
               type="button"
               onClick={handleToggleLike}
