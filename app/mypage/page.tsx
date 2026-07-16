@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar, LoadingState } from '@/components/common';
+import { COUPONS } from '@/lib/coupons';
 import { getLikedProducts, getProductsByUser, updateProductStatus } from '@/lib/products';
 import { unlikeProduct } from '@/lib/likes';
 import { getProfile } from '@/lib/profile';
@@ -21,14 +22,15 @@ import type { ProductSummary } from '@/lib/products';
 import type { Profile } from '@/types/profile';
 import type { ProductStatus } from '@/types/product';
 
-type Tab = 'mine' | 'liked';
+type Tab = 'mine' | 'liked' | 'coupons';
 
 export default function MyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [tab, setTab] = useState<Tab>('mine');
+  const [tab, setTab] = useState<Tab>(searchParams.get('tab') === 'coupons' ? 'coupons' : 'mine');
   const [myProducts, setMyProducts] = useState<ProductSummary[]>([]);
   const [likedProducts, setLikedProducts] = useState<ProductSummary[]>([]);
   const [statusMenuProductId, setStatusMenuProductId] = useState<string | null>(null);
@@ -147,7 +149,7 @@ export default function MyPage() {
         <p className="text-lg font-bold">{profile?.nickname ?? '친구'}</p>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 rounded-full bg-cream p-1">
+      <div className="mb-5 grid grid-cols-3 rounded-full bg-cream p-1">
         <button
           type="button"
           onClick={() => setTab('mine')}
@@ -168,9 +170,41 @@ export default function MyPage() {
         >
           좋아요한 상품
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('coupons')}
+          className={cn(
+            'rounded-full py-2 text-sm font-semibold transition',
+            tab === 'coupons' ? 'bg-white text-text-primary shadow-soft' : 'text-text-secondary',
+          )}
+        >
+          쿠폰함
+        </button>
       </div>
 
-      {activeList.length === 0 ? (
+      {tab === 'coupons' ? (
+        <ul className="space-y-3">
+          {COUPONS.map((coupon) => (
+            <li
+              key={coupon.id}
+              className="flex items-center gap-3 rounded-card border border-border p-4"
+            >
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-cream text-2xl">
+                {coupon.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-sm font-bold">{coupon.title}</p>
+                  <span className="flex-shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[0.65rem] font-semibold text-text-secondary">
+                    {coupon.badge}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-text-secondary">{coupon.description}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : activeList.length === 0 ? (
         <p className="py-12 text-center text-sm text-text-secondary">
           {tab === 'mine' ? '아직 등록한 상품이 없어요' : '아직 좋아요한 상품이 없어요'}
         </p>

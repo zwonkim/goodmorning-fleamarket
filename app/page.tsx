@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Skeleton } from '@/components/common';
 import { getProfile } from '@/lib/profile';
@@ -15,12 +16,18 @@ import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 const POPULAR_MIN_SCORE = 3;
 const POPULAR_LIMIT = 6;
 
+function couponGiftSeenKey(userId: string) {
+  return `coupon-gift-seen:${userId}`;
+}
+
 export default function HomePage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [products, setProducts] = useState<FeaturedProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [showCouponGift, setShowCouponGift] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -92,6 +99,29 @@ export default function HomePage() {
       subscription.unsubscribe();
     };
   }, [supabase.auth]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const seen = window.localStorage.getItem(couponGiftSeenKey(user.id));
+    if (!seen) {
+      setShowCouponGift(true);
+    }
+  }, [user]);
+
+  const dismissCouponGift = () => {
+    if (user) {
+      window.localStorage.setItem(couponGiftSeenKey(user.id), '1');
+    }
+    setShowCouponGift(false);
+  };
+
+  const goToCouponBox = () => {
+    dismissCouponGift();
+    router.push('/mypage?tab=coupons');
+  };
 
   const displayName = profile?.nickname ?? user?.email?.split('@')[0] ?? '친구';
 
@@ -227,7 +257,50 @@ export default function HomePage() {
       >
         +
       </Link>
+
+      {showCouponGift ? (
+        <CouponGiftModal onDismiss={dismissCouponGift} onOpenCoupons={goToCouponBox} />
+      ) : null}
     </main>
+  );
+}
+
+function CouponGiftModal({
+  onDismiss,
+  onOpenCoupons,
+}: {
+  onDismiss: () => void;
+  onOpenCoupons: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/40 px-6">
+      <div className="w-full max-w-[320px] overflow-hidden rounded-2xl bg-white shadow-soft">
+        <div className="bg-gradient-to-r from-[#ff8da1] to-[#e0457f] py-3.5 text-center text-[0.95rem] font-bold text-white">
+          특별 쿠폰 지급 안내
+        </div>
+        <button type="button" onClick={onOpenCoupons} className="block w-full px-6 pb-6 pt-6 text-left">
+          <p className="text-[1.55rem] font-extrabold leading-[1.35] text-text-primary">
+            축하합니다!
+            <br />
+            <span className="text-[#e0457f]">쿠폰팩</span>을
+            <br />
+            선물해 드렸어요.
+          </p>
+          <p className="mt-3 text-sm font-bold text-text-secondary">지금 쿠폰함을 확인해 보세요.</p>
+          <div className="mt-5 ml-auto flex w-fit flex-col items-center gap-1">
+            <img
+              src="/assets/mascot/sun_10_package.svg"
+              alt="Good Morning mascot"
+              className="h-24 w-24"
+            />
+            <p className="text-xs text-text-secondary">햇님 이미지를 누르세요</p>
+          </div>
+        </button>
+      </div>
+      <button type="button" onClick={onDismiss} className="text-sm font-medium text-white/90">
+        오늘은 그만 보기
+      </button>
+    </div>
   );
 }
 
