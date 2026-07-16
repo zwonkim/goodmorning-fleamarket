@@ -136,13 +136,12 @@ export async function cleanupProductUpload(
   await supabase.from('products').delete().eq('id', productId);
 }
 
-export async function getFeaturedProducts(limit = 4): Promise<FeaturedProduct[]> {
+export async function getFeaturedProducts(): Promise<FeaturedProduct[]> {
   const supabase = createClient();
   const { data: products, error: productsError } = await supabase
     .from('products')
     .select('id, title, price')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order('created_at', { ascending: false });
 
   if (productsError || !products || products.length === 0) {
     return [];
